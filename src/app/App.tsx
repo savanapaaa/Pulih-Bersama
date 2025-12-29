@@ -79,7 +79,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentUser, saveDiagnosisResult, symptoms } = useApp();
+  const { currentUser, saveDiagnosisResult, symptoms, recommendations: adminRecommendations } = useApp();
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
   const navigate = useNavigate();
 
@@ -239,7 +239,7 @@ const AppContent: React.FC = () => {
     else if (riskCounts.Tinggi >= 1 || riskCounts.Sedang >= 3) overallRisk = "Sedang";
 
     // Generate recommendations based on dominant category
-    const recommendations: Record<string, string[]> = {
+    const fallbackRecommendations: Record<string, string[]> = {
       "Gangguan Tidur & Keluhan Fisik": [
         "Buat rutinitas tidur yang konsisten setiap hari",
         "Hindari penggunaan gadget 1 jam sebelum tidur",
@@ -272,6 +272,19 @@ const AppContent: React.FC = () => {
       ],
     };
 
+    const normalizeText = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+    const adminTitlesForCategory = adminRecommendations
+      .filter((r) => normalizeText(r.category) === normalizeText(dominantCategory))
+      .slice(0, 6)
+      .map((r) => r.title)
+      .filter(Boolean);
+
+    const finalRecommendations =
+      adminTitlesForCategory.length > 0
+        ? adminTitlesForCategory
+        : (fallbackRecommendations[dominantCategory] || []);
+
     return {
       id: Date.now().toString(),
       userId: currentUser?.id || "",
@@ -280,7 +293,7 @@ const AppContent: React.FC = () => {
       cfScores: categoryScores,
       dominantCategory,
       overallRisk,
-      recommendations: recommendations[dominantCategory] || [],
+      recommendations: finalRecommendations,
       raw_answers: answers,
     };
   };

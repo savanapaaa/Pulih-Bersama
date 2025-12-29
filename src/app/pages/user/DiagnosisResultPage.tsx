@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { DiagnosisResult } from '../../context/AppContext';
+import { DiagnosisResult, useApp } from '../../context/AppContext';
 import { CircleCheck, TrendingUp, Save, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -12,11 +12,27 @@ interface DiagnosisResultPageProps {
 }
 
 export const DiagnosisResultPage: React.FC<DiagnosisResultPageProps> = ({ result, onSave, onNavigate }) => {
+  const { recommendations: adminRecommendations } = useApp();
+
   const toPercentLabel = (cf?: number) => {
     if (cf === undefined || cf === null || !Number.isFinite(cf)) return '';
     const percent = Math.round(Math.max(0, Math.min(1, cf)) * 100);
     return `${percent}%`;
   };
+
+  const normalizeText = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const getSafeUrl = (raw: string): string | null => {
+    if (!raw) return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const matchedAdminRecommendations = adminRecommendations
+    .filter((r) => normalizeText(r.category) === normalizeText(result.dominantCategory))
+    .slice(0, 6);
 
   const overallPercent = result.cfScores
     ? Math.round(
@@ -148,17 +164,52 @@ export const DiagnosisResultPage: React.FC<DiagnosisResultPageProps> = ({ result
       <Card className="border-2">
         <CardContent className="p-8 space-y-6">
           <h3 className="text-2xl font-semibold text-gray-800">Rekomendasi untuk Kamu</h3>
-          
-          <div className="space-y-4">
-            {result.recommendations.map((recommendation, index) => (
-              <div key={index} className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
-                <div className="w-6 h-6 bg-[#93c5fd] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-white text-sm">{index + 1}</span>
+
+          {matchedAdminRecommendations.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {matchedAdminRecommendations.map((rec) => {
+                const safeUrl = getSafeUrl(rec.link);
+                const typeBadgeClass =
+                  rec.type === 'Video'
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-blue-100 text-blue-700';
+
+                return (
+                  <Card key={rec.id} className="border-2 overflow-hidden">
+                    <div className="h-20 bg-gray-900" />
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className={`px-2 py-1 rounded text-xs ${typeBadgeClass}`}>{rec.type}</span>
+                      </div>
+                      <p className="text-sm text-gray-800 font-medium line-clamp-3">{rec.title}</p>
+                      <Button
+                        variant="outline"
+                        className="w-full border-2 border-[#93c5fd] text-[#1e3a8a] hover:bg-[#93c5fd]/10"
+                        disabled={!safeUrl}
+                        onClick={() => {
+                          if (!safeUrl) return;
+                          window.open(safeUrl, '_blank', 'noopener,noreferrer');
+                        }}
+                      >
+                        Buka {rec.type === 'Video' ? 'Video' : 'Artikel'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {result.recommendations.map((recommendation, index) => (
+                <div key={index} className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
+                  <div className="w-6 h-6 bg-[#93c5fd] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-sm">{index + 1}</span>
+                  </div>
+                  <p className="text-gray-700 flex-1">{recommendation}</p>
                 </div>
-                <p className="text-gray-700 flex-1">{recommendation}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           <Card className="bg-gradient-to-r from-[#fde68a]/20 to-[#fca5a5]/20 border-2 border-[#fde68a]">
             <CardContent className="p-6">
